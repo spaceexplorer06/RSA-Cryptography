@@ -1,7 +1,8 @@
+// App.jsx
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Copy, Sun, Moon } from 'lucide-react';
+import { Copy, Sun, Moon, ShieldCheck, Terminal, FileDown } from 'lucide-react';
 import toast, { Toaster } from 'react-hot-toast';
 
 export default function App() {
@@ -12,6 +13,25 @@ export default function App() {
   const [encrypted, setEncrypted] = useState('');
   const [decrypted, setDecrypted] = useState('');
   const [darkMode, setDarkMode] = useState(false);
+  const [firewallStatus, setFirewallStatus] = useState('idle');
+  const [firewallLogs, setFirewallLogs] = useState([]);
+
+  const logFirewallEvent = (event) => {
+    const timestamp = new Date().toLocaleTimeString();
+    setFirewallLogs((prev) => [...prev, `[${timestamp}] ${event}`].slice(-5));
+  };
+
+  const exportLogs = () => {
+    const blob = new Blob([firewallLogs.join('\n')], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'firewall_logs.txt';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
 
   const generateKeys = async () => {
     try {
@@ -22,8 +42,10 @@ export default function App() {
       setDecrypted('');
       setMessage('');
       toast.success('🔑 RSA keys generated!');
+      logFirewallEvent('New RSA key pair generated.');
     } catch (err) {
       toast.error('Failed to generate keys');
+      logFirewallEvent('RSA key generation failed.');
     }
   };
 
@@ -39,9 +61,13 @@ export default function App() {
       });
       setEncrypted(res.data.encrypted);
       setDecrypted('');
+      setFirewallStatus('authorized');
       toast.success('🔐 Message encrypted!');
+      logFirewallEvent('Encryption request granted.');
     } catch (err) {
       toast.error('Encryption failed');
+      setFirewallStatus('unauthorized');
+      logFirewallEvent('Encryption attempt blocked.');
     }
   };
 
@@ -53,8 +79,10 @@ export default function App() {
       });
       setDecrypted(res.data.decrypted);
       toast.success('🔓 Message decrypted!');
+      logFirewallEvent('Decryption successful.');
     } catch (err) {
       toast.error('Decryption failed');
+      logFirewallEvent('Unauthorized decryption attempt.');
     }
   };
 
@@ -144,6 +172,7 @@ export default function App() {
         )}
 
         <AnimatePresence mode="wait">
+          {/* Encryption tab */}
           {activeTab === 'encrypt' && (
             <motion.div
               key="encrypt"
@@ -178,6 +207,7 @@ export default function App() {
             </motion.div>
           )}
 
+          {/* Decryption tab */}
           {activeTab === 'decrypt' && (
             <motion.div
               key="decrypt"
@@ -212,6 +242,7 @@ export default function App() {
             </motion.div>
           )}
 
+          {/* About tab */}
           {activeTab === 'about' && (
             <motion.div
               key="about"
@@ -227,6 +258,60 @@ export default function App() {
             </motion.div>
           )}
         </AnimatePresence>
+
+        {/* RSA Firewall Visualizer */}
+        <section className="mt-12 bg-indigo-100 dark:bg-gray-900 p-6 rounded-2xl shadow-xl">
+          <h2 className="text-2xl font-bold text-indigo-700 dark:text-indigo-300 mb-4">🛡️ RSA Firewall Simulation</h2>
+          <div className="relative flex flex-col md:flex-row items-center justify-between gap-6">
+            <div className="p-4 bg-white dark:bg-gray-800 rounded-xl shadow w-full text-center">
+              <p className="font-semibold mb-2">🔁 Message</p>
+              <motion.div
+                animate={{ x: [0, 20, -20, 0] }}
+                transition={{ duration: 2, repeat: Infinity }}
+                className="px-4 py-2 bg-indigo-200 dark:bg-indigo-600 text-indigo-900 dark:text-white rounded-full font-mono"
+              >
+                Hello RSA!
+              </motion.div>
+            </div>
+
+            <div className="p-4 bg-indigo-200 dark:bg-indigo-600 rounded-xl shadow text-center">
+              <p className="font-semibold mb-1">🔐 RSA Encrypts</p>
+              <p className="text-xs text-gray-700 dark:text-gray-200">Using Public Key</p>
+            </div>
+
+            <div className="p-4 border-4 border-dashed border-indigo-500 dark:border-indigo-400 rounded-xl w-full text-center">
+              <p className="font-bold text-indigo-700 dark:text-indigo-300 mb-1">🛡️ Firewall</p>
+              <p className={`text-xs font-semibold ${firewallStatus === 'authorized' ? 'text-green-600 dark:text-green-400' : firewallStatus === 'unauthorized' ? 'text-red-500 dark:text-red-400' : 'text-gray-600 dark:text-gray-400'}`}>
+                {firewallStatus === 'authorized' ? 'Access Granted' : firewallStatus === 'unauthorized' ? 'Access Denied' : 'Awaiting Request'}
+              </p>
+            </div>
+
+            <div className="p-4 bg-green-100 dark:bg-green-700 rounded-xl shadow text-center">
+              <p className="font-semibold mb-1">🔓 Decrypted Message</p>
+              <p className="text-xs text-gray-700 dark:text-gray-200">Using Private Key</p>
+            </div>
+          </div>
+
+          {/* Firewall Logs */}
+          <div className="mt-6 bg-white dark:bg-gray-800 p-4 rounded-xl shadow-inner">
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="flex items-center text-sm font-bold text-gray-700 dark:text-gray-300">
+                <Terminal className="w-4 h-4 mr-2" /> Firewall Logs
+              </h3>
+              <button
+                onClick={exportLogs}
+                className="flex items-center px-3 py-1 bg-indigo-600 hover:bg-indigo-700 text-white text-xs rounded-md shadow"
+              >
+                <FileDown className="w-4 h-4 mr-1" /> Export Logs
+              </button>
+            </div>
+            <div className="text-xs font-mono text-gray-600 dark:text-gray-400 space-y-1">
+              {firewallLogs.length > 0 ? firewallLogs.map((log, i) => (
+                <div key={i}>{log}</div>
+              )) : <div>No activity yet...</div>}
+            </div>
+          </div>
+        </section>
 
         <div className="text-center text-sm text-gray-400 dark:text-gray-500 mt-12">
           © {new Date().getFullYear()} RSA Web Tool • Built with 💙 by Moinak and Aayush
